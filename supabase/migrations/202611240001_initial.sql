@@ -44,20 +44,24 @@ create index if not exists media_event_idx on public.event_media(event_id);
 
 create or replace function public.is_family_member(target_family uuid)
 returns boolean language sql stable security definer set search_path = public
-as $$ select exists(select 1 from public.family_members where family_id = target_family and user_id = auth.uid()); $$;
+as $ select exists(select 1 from public.family_members where family_id = target_family and user_id = auth.uid()); $;
+
+create or replace function public.is_family_creator(target_family uuid)
+returns boolean language sql stable security definer set search_path = public
+as $ select exists(select 1 from public.families where id = target_family and created_by = auth.uid()); $;
 
 alter table public.families enable row level security;
 alter table public.family_members enable row level security;
 alter table public.events enable row level security;
 alter table public.event_media enable row level security;
 
-create policy "members read family" on public.families for select to authenticated using (public.is_family_member(id));
+create policy "members and creator read family" on public.families for select to authenticated using (public.is_family_member(id) or created_by = auth.uid());
 create policy "signed in users create family" on public.families for insert to authenticated with check (created_by = auth.uid());
 create policy "owners update family" on public.families for update to authenticated using (created_by = auth.uid()) with check (created_by = auth.uid());
 
 create policy "members read memberships" on public.family_members for select to authenticated using (public.is_family_member(family_id));
 create policy "creator adds self" on public.family_members for insert to authenticated with check (
-  user_id = auth.uid() and exists(select 1 from public.families f where f.id = family_id and f.created_by = auth.uid())
+  user_id = auth.uid() and public.is_family_creator(family_id)
 );
 
 create policy "members read events" on public.events for select to authenticated using (public.is_family_member(family_id));
