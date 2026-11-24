@@ -44,11 +44,11 @@ create index if not exists media_event_idx on public.event_media(event_id);
 
 create or replace function public.is_family_member(target_family uuid)
 returns boolean language sql stable security definer set search_path = public
-as $ select exists(select 1 from public.family_members where family_id = target_family and user_id = auth.uid()); $;
+as $$ select exists(select 1 from public.family_members where family_id = target_family and user_id = auth.uid()); $$;
 
 create or replace function public.is_family_creator(target_family uuid)
 returns boolean language sql stable security definer set search_path = public
-as $ select exists(select 1 from public.families where id = target_family and created_by = auth.uid()); $;
+as $$ select exists(select 1 from public.families where id = target_family and created_by = auth.uid()); $$;
 
 alter table public.families enable row level security;
 alter table public.family_members enable row level security;
