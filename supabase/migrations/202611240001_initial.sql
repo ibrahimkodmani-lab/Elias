@@ -4,6 +4,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.families (
   id uuid primary key default gen_random_uuid(),
   name text not null check (char_length(name) between 1 and 80),
+  birth_date date,
   invite_code text not null unique default upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 10)),
   created_by uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
