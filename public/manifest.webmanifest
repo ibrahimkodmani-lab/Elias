@@ -8,9 +8,10 @@
   "theme_color": "#f7f3ed",
   "icons": [
     {
-      "src": "/elias-heart-2026.png",
+      "src": "/elias-heart-2026.png?v=3",
       "sizes": "180x180",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     }
   ]
 }
