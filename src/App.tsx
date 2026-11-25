@@ -99,7 +99,7 @@ export default function App() {
   async function sendMagicLink(e: React.FormEvent) {
     e.preventDefault(); setError("");
     if (!email.trim()) return;
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin } });
+    const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: "https://elias-cih.pages.dev" } });
     if (error) setError(error.message); else setAuthSent(true);
   }
 
