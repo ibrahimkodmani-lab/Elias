@@ -43,6 +43,9 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [email, setEmail] = useState("");
   const [authSent, setAuthSent] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register" | "reset">("login");
+  const [password, setPassword] = useState("");
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [family, setFamily] = useState<Family | null>(null);
   const [events, setEvents] = useState<EventWithMedia[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,7 +64,7 @@ export default function App() {
   useEffect(() => {
     const timer = window.setTimeout(() => setBooting(false), 2100);
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data: listener } = supabase.auth.onAuthStateChange((event, next) => { setSession(next); if (event === "PASSWORD_RECOVERY") setPasswordRecovery(true); });
     return () => { window.clearTimeout(timer); listener.subscription.unsubscribe(); };
   }, []);
 
@@ -96,11 +99,30 @@ export default function App() {
     setEvents(enriched); setLoading(false);
   }
 
-  async function sendMagicLink(e: React.FormEvent) {
+  async function handleAuth(e: React.FormEvent) {
     e.preventDefault(); setError("");
     if (!email.trim()) return;
-    const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: "https://elias-cih.pages.dev" } });
-    if (error) setError(error.message); else setAuthSent(true);
+    if (authMode === "reset") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: "https://elias-cih.pages.dev" });
+      if (error) setError(error.message); else setAuthSent(true);
+      return;
+    }
+    if (password.length < 8) { setError("Dein Passwort muss mindestens 8 Zeichen haben."); return; }
+    if (authMode === "register") {
+      const { error } = await supabase.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: "https://elias-cih.pages.dev" } });
+      if (error) setError(error.message); else setAuthSent(true);
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) setError(error.message === "Invalid login credentials" ? "E-Mail oder Passwort ist nicht richtig. Falls du bisher den E-Mail-Link genutzt hast, wähle bitte „Passwort festlegen / vergessen“." : error.message);
+    }
+  }
+
+  async function saveNewPassword(e: React.FormEvent) {
+    e.preventDefault(); setError("");
+    if (password.length < 8) { setError("Dein Passwort muss mindestens 8 Zeichen haben."); return; }
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) setError(error.message);
+    else { setPasswordRecovery(false); setPassword(""); setAuthMode("login"); }
   }
 
   async function createFamily(e: React.FormEvent) {
@@ -157,7 +179,9 @@ export default function App() {
 
   if (!isSupabaseConfigured) return <main className="setup-screen"><div className="brand"><Heart fill="currentColor" /> elias<span>.</span></div><h1>Fast geschafft!</h1><p>Trage zuerst deine Supabase-Projektdaten ein, damit Elias' Erinnerungen sicher gespeichert werden können.</p><code>VITE_SUPABASE_URL<br/>VITE_SUPABASE_ANON_KEY</code><p className="muted">Details findest du in der README im GitHub-Repository.</p></main>;
 
-  if (!session) return <main className="auth-screen"><div className="auth-card"><div className="brand"><Heart fill="currentColor" /> elias<span>.</span></div><div className="eyebrow">EIN ORT FÜR DIE SCHÖNSTEN MOMENTE</div><h1>Eine Kindheit.<br/><em>Unzählige Erinnerungen.</em></h1><p className="muted">Melde dich mit deiner E-Mail-Adresse an. Wir schicken dir einen sicheren Anmeldelink.</p>{authSent ? <div className="success"><Mail size={22}/><b>Schau in dein Postfach!</b><span>Wir haben einen Anmeldelink an {email} geschickt.</span></div> : <form onSubmit={sendMagicLink}><label>E-Mail-Adresse</label><input type="email" placeholder="du@beispiel.de" value={email} onChange={e => setEmail(e.target.value)} required/><button className="primary full"><Send size={17}/> Anmeldelink senden</button></form>}{error && <p className="error">{error}</p>}<div className="privacy-note"><Heart size={15}/> Nur eingeladene Familienmitglieder sehen eure Erinnerungen.</div></div><div className="auth-art"><div className="sun"/><div className="art-copy"><span>ELIAS' ERSTE 2 JAHRE</span><h2>Die kleinen Dinge<br/>werden zu den<br/><i>größten Erinnerungen.</i></h2></div><div className="art-flower">✿</div></div></main>;
+  if (passwordRecovery) return <main className="auth-screen"><div className="auth-card"><div className="brand"><Heart fill="currentColor" /> elias<span>.</span></div><div className="eyebrow">SICHERHEIT</div><h1>Neues Passwort</h1><p className="muted">Lege jetzt dein neues Passwort fest.</p><form onSubmit={saveNewPassword}><label>Neues Passwort</label><input type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/><button className="primary full">Passwort speichern</button></form>{error && <p className="error">{error}</p>}</div><div className="auth-art"><div className="sun"/><div className="art-copy"><span>ELIAS' ERSTE 2 JAHRE</span><h2>Die kleinen Dinge<br/>werden zu den<br/><i>größten Erinnerungen.</i></h2></div></div></main>;
+
+  if (!session) return <main className="auth-screen"><div className="auth-card"><div className="brand"><Heart fill="currentColor" /> elias<span>.</span></div><div className="eyebrow">EIN ORT FÜR DIE SCHÖNSTEN MOMENTE</div><h1>Eine Kindheit.<br/><em>Unzählige Erinnerungen.</em></h1><p className="muted">{authMode === "register" ? "Erstelle dein Konto. Du bestätigst deine E-Mail-Adresse einmalig." : authMode === "reset" ? "Wir senden dir einen Link, um dein Passwort festzulegen oder zurückzusetzen." : "Melde dich mit deiner E-Mail-Adresse und deinem Passwort an."}</p>{authSent ? <div className="success"><Mail size={22}/><b>Schau in dein Postfach!</b><span>{authMode === "register" ? "Wir haben den Bestätigungslink an " : "Wir haben den Link an "}{email} geschickt. Öffne ihn einmalig und kehre danach zur Elias-App zurück.</span><button className="secondary full" onClick={()=>{setAuthSent(false);setAuthMode("login");}}>Zur Anmeldung</button></div> : <form onSubmit={handleAuth}><label>E-Mail-Adresse</label><input type="email" autoComplete="email" placeholder="du@beispiel.de" value={email} onChange={e => setEmail(e.target.value)} required/>{authMode !== "reset" && <><label>Passwort</label><input type="password" autoComplete={authMode === "register" ? "new-password" : "current-password"} placeholder="Mindestens 8 Zeichen" value={password} onChange={e=>setPassword(e.target.value)} minLength={8} required/></>}<button className="primary full"><Send size={17}/>{authMode === "register" ? "Konto erstellen" : authMode === "reset" ? "Link senden" : "Anmelden"}</button></form>}{!authSent && <div className="auth-switch">{authMode === "login" ? <><button onClick={()=>{setAuthMode("register");setError("");}}>Noch kein Konto? Registrieren</button><button onClick={()=>{setAuthMode("reset");setError("");}}>Passwort festlegen / vergessen</button></> : <button onClick={()=>{setAuthMode("login");setError("");setAuthSent(false);}}>Zurück zur Anmeldung</button>}</div>}{error && <p className="error">{error}</p>}<div className="privacy-note"><Heart size={15}/> Nur eingeladene Familienmitglieder sehen eure Erinnerungen.</div></div><div className="auth-art"><div className="sun"/><div className="art-copy"><span>ELIAS' ERSTE 2 JAHRE</span><h2>Die kleinen Dinge<br/>werden zu den<br/><i>größten Erinnerungen.</i></h2></div><div className="art-flower">✿</div></div></main>;
 
   if (!family) return <main className="onboard"><div className="brand"><Heart fill="currentColor" /> elias<span>.</span></div><div className="onboard-card"><div className="round-icon"><Users/></div><div className="eyebrow">WILLKOMMEN IN ELIAS' WELT</div><h1>Gemeinsam Erinnerungen sammeln.</h1><p className="muted">Erstelle eure Familiengruppe oder tritt einer bestehenden mit einem Einladungscode bei.</p><form onSubmit={createFamily}><label>Name eurer Familiengruppe</label><input value={familyName} onChange={e=>setFamilyName(e.target.value)} required/><label>Geburtsdatum von Elias</label><input type="date" value={birthDate} onChange={e=>setBirthDate(e.target.value)} required/><button className="primary full" disabled={loading}><Sparkles size={17}/> Familienchronik erstellen</button></form><div className="or"><span/> oder <span/></div><button className="secondary full" onClick={()=>setShowJoin(!showJoin)}><Users size={17}/> Mit Einladungscode beitreten <ChevronDown size={16}/></button>{showJoin && <form className="join-form" onSubmit={joinFamily}><label>Einladungscode</label><input value={inviteCode} onChange={e=>setInviteCode(e.target.value.toUpperCase())} placeholder="z. B. A1B2C3D4" required/><button className="primary full" disabled={loading}>Familie beitreten</button></form>}{error && <p className="error">{error}</p>}</div><button className="logout" onClick={()=>supabase.auth.signOut()}><LogOut size={15}/> Abmelden</button></main>;
 
