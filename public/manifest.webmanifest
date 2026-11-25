@@ -1,0 +1,16 @@
+{
+  "name": "Elias",
+  "short_name": "Elias",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ed",
+  "theme_color": "#f7f3ed",
+  "icons": [
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}
